@@ -28,7 +28,6 @@ else:
 
 #init video
 cap = cv2.VideoCapture('/dev/video'+str(dev), cv2.CAP_V4L)
-
 #pull in the video but do NOT automatically convert to RGB, else it breaks the temperature data!
 #https://stackoverflow.com/questions/63108721/opencv-setting-videocap-property-to-cap-prop-convert-rgb-generates-weird-boolean
 cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
@@ -69,14 +68,14 @@ t_max = [] # List holds all the maximum temperature values as (K, C, mils from e
 def rec():
 	now = time.strftime("%Y%m%d--%H%M%S")
 	#do NOT use mp4 here, it is flakey!
-	videoOut = cv2.VideoWriter(now+'output.avi', cv2.VideoWriter_fourcc(*'XVID'),25, (newWidth,newHeight))
+	videoOut = cv2.VideoWriter(fi+now+'output.avi', cv2.VideoWriter_fourcc(*'XVID'),25, (newWidth,newHeight))
 	return(videoOut)
 
 def snapshot(heatmap):
 	#I would put colons in here, but it Win throws a fit if you try and open them!
 	now = time.strftime("%Y%m%d-%H%M%S") 
 	snaptime = time.strftime("%H:%M:%S")
-	cv2.imwrite("TC001"+now+".png", heatmap)
+	cv2.imwrite(fi+"TC001"+now+".png", heatmap)
 	return snaptime
 
 def getTemp(tdata,coor):
@@ -88,14 +87,14 @@ def getTemp(tdata,coor):
 	tempC = round(tempC,2)
 	tempK = (rawtemp/64)
 	tempk = round(tempK)
-	return (tempC, tempK)
+	return (tempc, tempk)
 
 def drawData(coor,temp):
     global scale
-    global width
-    global height
-    x = coor[0]
-    y = coor[1]
+    #global width
+    #global height
+    x = coor[0]*scale
+    y = coor[1]*scale
     print(x,y)
     # draw crosshairs
     cv2.line(heatmap,(x,y+20),\
@@ -116,11 +115,10 @@ def drawData(coor,temp):
 
 while(cap.isOpened()):
     ret, frame = cap.read()
-    if dataRec:
-        stamp = time.time()
     
     if ret:
         imdata, thdata = np.array_split(frame,2)
+        s = time.time()
         t = []
         #find the max temperature in the frame
         lomax = thdata[...,1].max()
@@ -153,15 +151,16 @@ while(cap.isOpened()):
         avgtemp = round(avgtemp,2)
 
         for i in pixels:
-            t.append(getTemp(thdata,i))
+            tC, tK = getTemp(thdata, i)
+            t.append((tC, tK))
         
         if dataRec:
             interval = stamp - s
             for i in range(0,len(pixels)):
-                temps[i].append((t[i][0],t[i][1],interval))
-            t_max.append((maxtemp+273.15,maxtemp,interval))
-            t_min.append((mintemp+273.15,mintemp,interval))
-            t_avg.append((avgtemp+273.15,avgtemp,interval))
+                temps[i].append(tC,tK,interval)
+            t_max.append((maxtemp,maxtemp+273.15,interval))
+            t_min.append((mintemp,mintemp+273.15,interval))
+            t_avg.append((avgtemp,avgtemp+273.15,interval))
         
         # Convert the real image to RGB
         bgr = cv2.cvtColor(imdata,  cv2.COLOR_YUV2BGR_YUYV)
@@ -275,7 +274,7 @@ while(cap.isOpened()):
         keyPress = cv2.waitKey(1)
         if keyPress == ord('[') and dataRec == False: #Starts the data collection
             dataRec = True
-            s = time.time()
+            stamp = time.time()
 
         if keyPress == ord(']') and dataRec == True: #Starts the data collection
             dataRec = False
@@ -373,12 +372,59 @@ if len(temps[0]) > 1:
             # writing the data rows
             for j in temps[i]:
                 csvwriter.writerow(j)
-            
+    fn = fi+'average.csv'
+    csvfile = open(fn, 'w')
+    csvwriter = csv.writer(csvfile)
+    csvwriter.writerow(fields)
+    for i in t_avg:
+        csvwriter.writerow(i)
+    
+    fn = fi+'max.csv'
+    csvfile = open(fn, 'w')
+    csvwriter = csv.writer(csvfile)
+    csvwriter.writerow(fields)
+    for i in t_max:
+        csvwriter.writerow(i)
 
-x = []
-y = []
-for i in temps[0]:
-    y.append(i[0])
-    x.append(i[-1])
-plt.plot(x,y)
-plt.show()
+    fn = fi+'min.csv'
+    csvfile = open(fn, 'w')
+    csvwriter = csv.writer(csvfile)
+    csvwriter.writerow(fields)
+    for i in t_min:
+        csvwriter.writerow(i)
+    for j in range(0,len(temps)):
+        x = []
+        y = []
+        for i in temps[j]:
+            y.append(i[1])
+            x.append(i[-1])
+        plt.plot(x,y)
+        plt.savefig(fi+str(j)+'-pixelGraph.jpg')
+    
+    x = []
+    y = []
+    for i in t_max:
+        y.append(i[1])
+        x.append(i[-1])
+    plt.plot(x,y)
+    plt.savefig(fi+'maxGraph.jpg')
+
+    x = []
+    y = []
+    for i in t_min:
+        y.append(i[1])
+        x.append(i[-1])
+    plt.plot(x,y)
+    plt.savefig(fi+'minGraph.jpg')
+
+    x = []
+    y = []
+    for i in t_avg:
+        y.append(i[1])
+        x.append(i[-1])
+    plt.plot(x,y)
+    plt.savefig(fi+'avgGraph.jpg')
+
+    plt.show()
+
+print('Goodbye')
