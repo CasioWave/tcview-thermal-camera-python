@@ -10,21 +10,11 @@ of minimum, maximum and average temperature - along with any pixels that the use
 
 import cv2
 import numpy as np
-import argparse
 import time
 import matplotlib.pyplot as plt
 import csv
 
-# Gets the arguments required from the shell execution
-parser = argparse.ArgumentParser()
-parser.add_argument("--device", type=int, default=2, help="Video Device number e.g. 0, use v4l2-ctl --list-devices")
-args = parser.parse_args()
-
-if args.device:
-	dev = args.device
-else:
-	dev = 2
-
+dev = 0
 #init video
 cap = cv2.VideoCapture('/dev/video'+str(dev), cv2.CAP_V4L)
 #pull in the video but do NOT automatically convert to RGB, else it breaks the temperature data!
@@ -53,7 +43,7 @@ snaptime = "None"
 # New variables
 fi = './' # Path of the directory where the data will be written to
 dataRec = False # Set to True when the experiment is started
-pixels = [[96,128]] # List of the pixel coordinates to be monitored
+pixels = [[96,128],[1,1]] # List of the pixel coordinates to be monitored
 
 # This list will hold all the temperature and time data for the user specified pixels
 temps = []
@@ -78,15 +68,16 @@ def snapshot(heatmap):
 	return snaptime
 
 def getTemp(tdata,coor):
-	hi = tdata[coor[0]][coor[1]][0]
-	lo = tdata[coor[0]][coor[1]][1]
-	lo = lo*256
-	rawtemp = hi+lo
-	tempC = (rawtemp/64)-273.15
-	tempc = round(tempC,2)
-	tempK = (rawtemp/64)
-	tempk = round(tempK)
-	return (tempc, tempk)
+    hi = tdata[coor[0]][coor[1]][0]
+    lo = tdata[coor[0]][coor[1]][1]
+    lo = lo*256
+    rawtemp = hi+lo
+    tempC = (rawtemp/64)-273.15
+    tempc = round(tempC,2)
+    tempK = (rawtemp/64)
+    tempk = round(tempK)
+    print('Coor ->'+str(coor)+' T>'+str(tempc))
+    return (tempc, tempk)
 
 def drawData(coor,temp):
     global scale
@@ -94,7 +85,7 @@ def drawData(coor,temp):
     #global height
     x = coor[0]*scale
     y = coor[1]*scale
-    print(x,y)
+    #print(x,y)
     # draw crosshairs
     cv2.line(heatmap,(x,y+20),\
     (x,y-20),(255,255,255),2) #vline
@@ -114,7 +105,6 @@ def drawData(coor,temp):
 
 while(cap.isOpened()):
     ret, frame = cap.read()
-    
     if ret:
         imdata, thdata = np.array_split(frame,2)
         s = time.time()
@@ -135,7 +125,7 @@ while(cap.isOpened()):
         posmin = thdata[...,1].argmin()
         #since argmax returns a linear index, convert back to row and col
         lcol,lrow = divmod(posmin,width)
-        print(lcol)
+        #print(lcol)
         himin = thdata[lcol][lrow][0]
         lomin=lomin*256
         mintemp = himin+lomin
@@ -149,14 +139,14 @@ while(cap.isOpened()):
         avgtemp = (avgtemp/64)-273.15
         avgtemp = round(avgtemp,2)
 
-        for i in pixels:
-            tC, tK = getTemp(thdata, i)
+        for i in range(0,len(pixels)):
+            tC, tK = getTemp(thdata, pixels[i])
+            if dataRec:
+                interval = abs(stamp-s)
+                temps[i].append((tC,tK,interval))
             t.append((tC, tK))
         
         if dataRec:
-            interval = stamp - s
-            for i in range(0,len(pixels)):
-                temps[i].append(tC,tK,interval)
             t_max.append((maxtemp,maxtemp+273.15,interval))
             t_min.append((mintemp,mintemp+273.15,interval))
             t_avg.append((avgtemp,avgtemp+273.15,interval))
@@ -355,9 +345,9 @@ while(cap.isOpened()):
             snaptime = snapshot(heatmap)
 
         if keyPress == ord('q'):
-            break
             cap.release()
             cv2.destroyAllWindows()
+            break
 
 if len(temps[0]) > 1:
     fields = ['Temp (C)', 'Temp (K)', 'Timestamp (ms)']
@@ -399,6 +389,7 @@ if len(temps[0]) > 1:
             x.append(i[-1])
         plt.plot(x,y)
         plt.savefig(fi+str(j)+'-pixelGraph.jpg')
+        plt.clf()
     
     x = []
     y = []
@@ -407,6 +398,7 @@ if len(temps[0]) > 1:
         x.append(i[-1])
     plt.plot(x,y)
     plt.savefig(fi+'maxGraph.jpg')
+    plt.clf()
 
     x = []
     y = []
@@ -415,6 +407,7 @@ if len(temps[0]) > 1:
         x.append(i[-1])
     plt.plot(x,y)
     plt.savefig(fi+'minGraph.jpg')
+    plt.clf()
 
     x = []
     y = []
