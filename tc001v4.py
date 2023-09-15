@@ -12,7 +12,6 @@ import cv2
 import numpy as np
 import argparse
 import time
-import io
 import matplotlib.pyplot as plt
 import csv
 
@@ -84,7 +83,7 @@ def getTemp(tdata,coor):
 	lo = lo*256
 	rawtemp = hi+lo
 	tempC = (rawtemp/64)-273.15
-	tempC = round(tempC,2)
+	tempc = round(tempC,2)
 	tempK = (rawtemp/64)
 	tempk = round(tempK)
 	return (tempc, tempk)
@@ -300,7 +299,7 @@ while(cap.isOpened()):
                 scale = 5
             newWidth = width*scale
             newHeight = height*scale
-            if dispFullscreen == False and isPi == False:
+            if dispFullscreen == False:
                 cv2.resizeWindow('Thermal', newWidth,newHeight)
         if keyPress == ord('c'): #Decrease scale
             scale -= 1
@@ -308,7 +307,7 @@ while(cap.isOpened()):
                 scale = 1
             newWidth = width*scale
             newHeight = height*scale
-            if dispFullscreen == False and isPi == False:
+            if dispFullscreen == False:
                 cv2.resizeWindow('Thermal', newWidth,newHeight)
 
         if keyPress == ord('q'): #enable fullscreen
@@ -357,7 +356,7 @@ while(cap.isOpened()):
 
         if keyPress == ord('q'):
             break
-            capture.release()
+            cap.release()
             cv2.destroyAllWindows()
 
 if len(temps[0]) > 1:
