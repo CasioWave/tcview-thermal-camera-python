@@ -5,21 +5,23 @@ Diptanuj Sarkar 14 September 2023
 
 A python program that reads data from the Topdon TC001 Thermal camera.
 The program reads raw temperature data from the camera, tabulates it, and generates graphs
-of minimum, maximum and average temperature - along with any pixels that the user specifies
+of minimum, maximum and average temperature - along with any pixels that the user specifies.
 '''
 
+#Library imports
 import cv2
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 import csv
 
-dev = 0
+dev = 0 #Set the device id
 #init video
-cap = cv2.VideoCapture('/dev/video'+str(dev), cv2.CAP_V4L)
+cap = cv2.VideoCapture(dev, cv2.CAP_V4L) # OpenCV video capture object
 #pull in the video but do NOT automatically convert to RGB, else it breaks the temperature data!
 #https://stackoverflow.com/questions/63108721/opencv-setting-videocap-property-to-cap-prop-convert-rgb-generates-weird-boolean
 cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
+flTemp = True
 
 #256x192 General settings
 width = 256 #Sensor width
@@ -28,7 +30,7 @@ scale = 3 #scale multiplier
 newWidth = width*scale 
 newHeight = height*scale
 alpha = 1.0 # Contrast control (1.0-3.0)
-colormap = 0
+colormap = 0 #This variable stores the id of the color map that is to be applied to the image
 font=cv2.FONT_HERSHEY_SIMPLEX
 dispFullscreen = False
 cv2.namedWindow('Thermal',cv2.WINDOW_GUI_NORMAL)
@@ -50,22 +52,21 @@ temps = []
 for i in pixels:
 	temps.append([])
 
-t_avg = [] # List holds all the average temperature values as (K, C, mils from exp start, abs time)
-t_min = [] # List holds all the minimum temperature values as (K, C, mils from exp start, abs time)
-t_max = [] # List holds all the maximum temperature values as (K, C, mils from exp start, abs time)
+t_avg = [] # List holds all the average temperature values as (K, C, mils from exp start)
+t_min = [] # List holds all the minimum temperature values as (K, C, mils from exp start)
+t_max = [] # List holds all the maximum temperature values as (K, C, mils from exp start)
 
 def rec():
 	now = time.strftime("%Y%m%d--%H%M%S")
-	#do NOT use mp4 here, it is flakey!
+	#Do not use mp4
 	videoOut = cv2.VideoWriter(fi+now+'output.avi', cv2.VideoWriter_fourcc(*'XVID'),25, (newWidth,newHeight))
 	return(videoOut)
 
 def snapshot(heatmap):
-	#I would put colons in here, but it Win throws a fit if you try and open them!
-	now = time.strftime("%Y%m%d-%H%M%S") 
-	snaptime = time.strftime("%H:%M:%S")
-	cv2.imwrite(fi+"TC001"+now+".png", heatmap)
-	return snaptime
+    now = time.strftime("%Y%m%d-%H%M%S") 
+    snaptime = time.strftime("%H:%M:%S")
+    cv2.imwrite(fi+"TC001"+now+".png", heatmap)
+    return snaptime
 
 def getTemp(tdata,coor):
     hi = tdata[coor[0]][coor[1]][0]
@@ -76,13 +77,12 @@ def getTemp(tdata,coor):
     tempc = round(tempC,2)
     tempK = (rawtemp/64)
     tempk = round(tempK)
-    print('Coor ->'+str(coor)+' T>'+str(tempc))
+    #print('Coor ->'+str(coor)+' T>'+str(tempc))
     return (tempc, tempk)
 
 def drawData(coor,temp):
-    global scale
-    #global width
-    #global height
+    global heatmap # It is the image that the data will be drawn on
+    global scale # Scale of the interpolated image so that the coordinates can be shifted
     x = coor[0]*scale
     y = coor[1]*scale
     #print(x,y)
@@ -132,6 +132,7 @@ while(cap.isOpened()):
         mintemp = (mintemp/64)-273.15
         mintemp = round(mintemp,2)
 
+        #Calculate average temperature of the scene
         loavg = thdata[...,1].mean()
         hiavg = thdata[...,0].mean()
         loavg=loavg*256
@@ -139,6 +140,7 @@ while(cap.isOpened()):
         avgtemp = (avgtemp/64)-273.15
         avgtemp = round(avgtemp,2)
 
+        #For each of the pixels tracked, find the temperature and store ir
         for i in range(0,len(pixels)):
             tC, tK = getTemp(thdata, pixels[i])
             if dataRec:
@@ -146,6 +148,7 @@ while(cap.isOpened()):
                 temps[i].append((tC,tK,interval))
             t.append((tC, tK))
         
+        #Data for the average, min, and max temperatures will only be recorded if dataRec is on
         if dataRec:
             t_max.append((maxtemp,maxtemp+273.15,interval))
             t_min.append((mintemp,mintemp+273.15,interval))
@@ -196,6 +199,7 @@ while(cap.isOpened()):
             heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
             cmapText = 'Inv Rainbow'
         
+        #Draws the cursor for each of the pixels being tracked, and draws temperature of the point in C
         for i in range(0,len(pixels)):
             drawData(pixels[i],t[i][0])
 
@@ -232,28 +236,29 @@ while(cap.isOpened()):
                 cv2.putText(heatmap,'Recording: '+elapsed, (10, 112),\
                 cv2.FONT_HERSHEY_SIMPLEX, 0.4,(40, 40, 255), 1, cv2.LINE_AA)
 
-        #Yeah, this looks like we can probably do this next bit more efficiently!
         #display floating max temp
-        if maxtemp > avgtemp+threshold:
-            cv2.circle(heatmap, (mrow*scale, mcol*scale), 5, (0,0,0), 2)
-            cv2.circle(heatmap, (mrow*scale, mcol*scale), 5, (0,0,255), -1)
-            cv2.putText(heatmap,str(maxtemp)+' C', ((mrow*scale)+10, (mcol*scale)+5),\
-            cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0,0,0), 2, cv2.LINE_AA)
-            cv2.putText(heatmap,str(maxtemp)+' C', ((mrow*scale)+10, (mcol*scale)+5),\
-            cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0, 255, 255), 1, cv2.LINE_AA)
+        if flTemp:
+            if maxtemp > avgtemp+threshold:
+                cv2.circle(heatmap, (mrow*scale, mcol*scale), 5, (0,0,0), 2)
+                cv2.circle(heatmap, (mrow*scale, mcol*scale), 5, (0,0,255), -1)
+                cv2.putText(heatmap,str(maxtemp)+' C', ((mrow*scale)+10, (mcol*scale)+5),\
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0,0,0), 2, cv2.LINE_AA)
+                cv2.putText(heatmap,str(maxtemp)+' C', ((mrow*scale)+10, (mcol*scale)+5),\
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0, 255, 255), 1, cv2.LINE_AA)
 
-        #display floating min temp
-        if mintemp < avgtemp-threshold:
-            cv2.circle(heatmap, (lrow*scale, lcol*scale), 5, (0,0,0), 2)
-            cv2.circle(heatmap, (lrow*scale, lcol*scale), 5, (255,0,0), -1)
-            cv2.putText(heatmap,str(mintemp)+' C', ((lrow*scale)+10, (lcol*scale)+5),\
-            cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0,0,0), 2, cv2.LINE_AA)
-            cv2.putText(heatmap,str(mintemp)+' C', ((lrow*scale)+10, (lcol*scale)+5),\
-            cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0, 255, 255), 1, cv2.LINE_AA)
+            #display floating min temp
+            if mintemp < avgtemp-threshold:
+                cv2.circle(heatmap, (lrow*scale, lcol*scale), 5, (0,0,0), 2)
+                cv2.circle(heatmap, (lrow*scale, lcol*scale), 5, (255,0,0), -1)
+                cv2.putText(heatmap,str(mintemp)+' C', ((lrow*scale)+10, (lcol*scale)+5),\
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0,0,0), 2, cv2.LINE_AA)
+                cv2.putText(heatmap,str(mintemp)+' C', ((lrow*scale)+10, (lcol*scale)+5),\
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45,(0, 255, 255), 1, cv2.LINE_AA)
 
         #display image
         cv2.imshow('Thermal',heatmap)
 
+        #Continue recording the video if the condition is true
         if recording == True:
             elapsed = (time.time() - start)
             elapsed = time.strftime("%H:%M:%S", time.gmtime(elapsed)) 
@@ -265,7 +270,7 @@ while(cap.isOpened()):
             dataRec = True
             stamp = time.time()
 
-        if keyPress == ord(']') and dataRec == True: #Starts the data collection
+        if keyPress == ord(']') and dataRec == True: #Ends the data collection
             dataRec = False
             s = time.time()
         
@@ -275,6 +280,12 @@ while(cap.isOpened()):
             rad -= 1
             if rad <= 0:
                 rad = 0
+        
+        #Turn on or off the Floating temperature drawing for max and min temp
+        if keyPress == ord(','):
+            flTemp = True
+        if keyPress == ord('.'):
+            flTemp = False
 
         if keyPress == ord('s'): #Increase threshold
             threshold += 1
@@ -300,7 +311,7 @@ while(cap.isOpened()):
             if dispFullscreen == False:
                 cv2.resizeWindow('Thermal', newWidth,newHeight)
 
-        if keyPress == ord('q'): #enable fullscreen
+        if keyPress == ord('i'): #enable fullscreen
             dispFullscreen = True
             cv2.namedWindow('Thermal',cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty('Thermal',cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
@@ -321,7 +332,7 @@ while(cap.isOpened()):
             if alpha<=0:
                 alpha = 0.0
 
-
+        #Hide or display the HUD on the screen
         if keyPress == ord('h'):
             if hud==True:
                 hud=False
@@ -333,22 +344,23 @@ while(cap.isOpened()):
             if colormap == 11:
                 colormap = 0
 
-        if keyPress == ord('r') and recording == False: #r to start reording
+        if keyPress == ord('r') and recording == False: #r to start recording
             videoOut = rec()
             recording = True
             start = time.time()
-        if keyPress == ord('t'): #f to finish reording
+        if keyPress == ord('t'): #t to finish recording
             recording = False
             elapsed = "00:00:00"
 
-        if keyPress == ord('p'): #f to finish reording
+        if keyPress == ord('p'): #p to take a snapshot of the current screen
             snaptime = snapshot(heatmap)
 
-        if keyPress == ord('q'):
+        if keyPress == ord('q'): #q to QUIT the application
             cap.release()
             cv2.destroyAllWindows()
             break
 
+#Store the tracked temperature data of all the pixels that were being tracked, and draw + save the graphs of pixels, max, min and avg temp
 if len(temps[0]) > 1:
     fields = ['Temp (C)', 'Temp (K)', 'Timestamp (ms)']
     for i in range(0,len(pixels)):
