@@ -1,0 +1,26 @@
+
+import pyvisa
+rm = pyvisa.ResourceManager()
+rm.list_resources()
+inst = rm.open_resource('GPIB0::15::INSTR')
+#print(inst.query("*IDN?"))
+#P=inst.query("Out2.Value?")
+
+cmdString="Out2.PID.Ramp"
+setValue=0.033
+inst.write(cmdString + ' ' + str(setValue))
+
+cmdString="Out2.PID.setpoint"
+setValue=310
+inst.write(cmdString + ' ' + str(setValue))
+
+
+with open('PIDData.txt','w+') as f:
+    f.write('T\n')
+
+    while(T<'320'):
+        T=inst.query("In2.Value?")
+        #f.write("295.44"+"\t"+"0.00"+"\n")
+        #f.write(t+"\t"+P+"\n")
+        f.write(T.strip()+"\n")
+        time.sleep(1)
