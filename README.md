@@ -59,3 +59,4 @@ The `dev` variable is set to define the video ID of the device that openCV will 
 - [ ] Add ability to record the temperature profile of the entire scene.
 - [ ] Add the ability to click and select pixels for tracking instead of specifying coordinates in code.
 - [ ] Improve data representation.
+- [ ] Add object tracking mode
