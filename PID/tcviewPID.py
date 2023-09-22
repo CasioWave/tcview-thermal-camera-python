@@ -31,7 +31,7 @@ cmdString="Out2.PID.setpoint"
 setValue=310
 inst.write(cmdString + ' ' + str(setValue))
 
-dev = 0 #Set the device id
+dev = 2 #Set the device id
 #init video
 cap = cv2.VideoCapture(dev, cv2.CAP_V4L) # OpenCV video capture object
 #pull in the video but do NOT automatically convert to RGB, else it breaks the temperature data!

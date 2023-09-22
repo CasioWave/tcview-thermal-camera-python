@@ -166,7 +166,7 @@ while(cap.isOpened()):
             tC, tK = getTemp(thdata, pixels[i])
             if dataRec:
                 interval = abs(stamp-s)
-                pidT.append((tK, interval))
+                pidT.append((T, interval))
                 temps[i].append((tC,tK,interval))
             t.append((tC, tK))
         
