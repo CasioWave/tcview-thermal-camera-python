@@ -1,5 +1,7 @@
 # tcview-thermal-camera-python
 
+Please head on over to [the new repo](https://github.com/CasioWave/thermal-camera-python) for a better implementation! I will be archiving this repository.
+
 # NOTE (20-01-2025)
 I will be archiving this repository soon - the calibration and software are not up to my liking (or use case, which is mostly physics experimentation). I will be carrying over the work to [here](https://github.com/CasioWave/topdon-tc001-python) from now on. I will be starting from scratch there. Hopefully, the software will be ready soon. Thanks!
 
